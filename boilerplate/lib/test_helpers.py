@@ -118,7 +118,9 @@ class HandlerHelpers():
     def register_user(self, username, password, email):
         """Register new user account.
 
+
         Optionally activate account and login with username and password."""
+
         form = self.get_form('/register/', 'form_register')
         form['username'] = username
         form['email'] = email
@@ -126,9 +128,13 @@ class HandlerHelpers():
         form['c_password'] = password
         self.submit(form)
 
-        users = models.User.query(models.User.username == username).fetch(2)
-        self.assertEqual(1, len(users), "{} could not register".format(username))
-        user = users[0]
+        # We can't query by the username with HRD eventual consistency, so we get the userid
+        # from the activation email
+        message = self.get_sent_messages(to=email, reset_mail_stub=False)[0]
+        url = self.get_url_from_message(message, 'activation')
+        user_id = re.match('^/activation/(\d+)/.*', url).group(1)
+        user = models.User.get_by_id(int(user_id))
+        self.assertIsNotNone(user, "{} could not register".format(username))
 
         return user
 

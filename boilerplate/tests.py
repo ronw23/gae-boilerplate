@@ -16,6 +16,7 @@ import webapp2
 import os
 import webtest
 from google.appengine.ext import testbed
+from google.appengine.datastore import datastore_stub_util
 
 from mock import Mock
 from mock import patch
@@ -55,7 +56,10 @@ class AppTest(unittest.TestCase, test_helpers.HandlerHelpers):
         # activate GAE stubs
         self.testbed = testbed.Testbed()
         self.testbed.activate()
-        self.testbed.init_datastore_v3_stub()
+        # Create a consistency policy that will simulate the High Replication consistency model.
+        self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=0)
+        # Initialize the datastore stub with this policy.
+        self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
         self.testbed.init_memcache_stub()
         self.testbed.init_urlfetch_stub()
         self.testbed.init_taskqueue_stub()
@@ -114,7 +118,9 @@ class AppTest(unittest.TestCase, test_helpers.HandlerHelpers):
         form = self.get_form('/', 'form_login_user')
         form['username'] = 'testuser'
         form['password'] = '123456'
+        self.policy.SetProbability(1)
         self.submit(form, expect_error=True, error_message='Please check your email to activate it')
+        self.policy.SetProbability(0)
         self.assert_user_not_logged_in()
         
     def _login_openid(self, provider, uid, email=None):
@@ -135,13 +141,17 @@ class AppTest(unittest.TestCase, test_helpers.HandlerHelpers):
         response = self._login_openid('google', 'http://www.google.com/accounts/123', 'testuser@example.com')
         self.assert_success_message_in_response(response, 'Welcome!  You have been registered as a new user')
         self.assert_user_logged_in()
+        self.policy.SetProbability(1)
         user = models.User.query().get()
+        self.policy.SetProbability(0)
         self.assertEqual('testuser@example.com', user.email)
 
     def test_login_openid(self):
         user = self.register_activate_testuser()
         models.SocialUser(user=user.key, provider='google', uid='http://www.google.com/accounts/123').put()
+        self.policy.SetProbability(1)
         self._login_openid('google', uid='http://www.google.com/accounts/123')
+        self.policy.SetProbability(0)
         self.assert_user_logged_in(user_id=user.get_id())
 
     def test_login_twitter_no_association(self):
@@ -206,7 +216,9 @@ class AppTest(unittest.TestCase, test_helpers.HandlerHelpers):
         form['username'] = 'testuser'
         form['password'] = '123456'
         # account is not activated
+        self.policy.SetProbability(1)
         response = self.submit(form, expect_error=True, error_message='Please check your email to activate it')
+        self.policy.SetProbability(0)
         self.assert_user_not_logged_in()
         # "lose" activation mail
         self.get_sent_messages(to='testuser@example.com')[0]
@@ -257,7 +269,9 @@ class AppTest(unittest.TestCase, test_helpers.HandlerHelpers):
         self.assertEqual(user.country, 'US')
 
         self.testapp.reset()
+        self.policy.SetProbability(1)
         self.login_user('testuser2', '123456')
+        self.policy.SetProbability(0)
 
     def test_logout(self):
         self.register_activate_login_testuser()
