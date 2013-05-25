@@ -1480,10 +1480,18 @@ class EmailChangedCompleteHandler(BaseHandler):
         else:
             # save new email
             user = verify[0]
+            old_email = user.email
             user.email = email
             user.put()
             # delete token
             models.User.delete_auth_token(int(user_id), token)
+            # Update Unique models
+            success = Unique.create('User.email:%s' % email)
+            if success:
+                # free old uniques
+                Unique.delete_multi(['User.email:%s' % old_email])
+                # The unique values were created, so we can save the user.
+            
             # add successful message and redirect
             message = _('Your email has been successfully updated.')
             self.add_message(message, 'success')

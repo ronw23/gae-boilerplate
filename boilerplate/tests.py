@@ -317,7 +317,7 @@ class AppTest(unittest.TestCase, test_helpers.HandlerHelpers):
         # Test that a new user can't register with the new email
         self.testapp.reset()
         form = self.get_form('/register/', 'form_register')
-        form['username'] = 'Reguser2'
+        form['username'] = 'Reguser3'
         form['email'] = 'tu@example.com'
         form['password'] = form['c_password'] = '456456'
         self.submit(form, expect_error=True, error_message='Sorry, The email tu@example.com is already registered.')
