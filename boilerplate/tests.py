@@ -305,6 +305,23 @@ class AppTest(unittest.TestCase, test_helpers.HandlerHelpers):
         self.get(url, status=302)
 
         self.assertEqual(user.email, 'tu@example.com')
+        
+        # Test that a new user can register with the old email
+        self.testapp.reset()
+        form = self.get_form('/register/', 'form_register')
+        form['username'] = 'Reguser2'
+        form['email'] = 'testuser@example.com'
+        form['password'] = form['c_password'] = '456456'
+        self.submit(form, success_message='You were successfully registered. Please check your email to activate your account')
+
+        # Test that a new user can't register with the new email
+        self.testapp.reset()
+        form = self.get_form('/register/', 'form_register')
+        form['username'] = 'Reguser2'
+        form['email'] = 'tu@example.com'
+        form['password'] = form['c_password'] = '456456'
+        self.submit(form, expect_error=True, error_message='Sorry, The email tu@example.com is already registered.')
+        
 
     def test_password_reset(self):
         self.register_activate_testuser()
